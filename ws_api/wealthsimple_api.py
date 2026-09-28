@@ -869,6 +869,33 @@ class WealthsimpleAPI(WealthsimpleAPIBase):
 
         return account
 
+    def get_creditcard_activity(self, activity_id: str) -> Any:
+        """Fetch the detail of one credit-card transaction.
+
+        Args:
+            activity_id: The ``externalCanonicalId`` of a ``CREDIT_CARD``
+                activity from :meth:`get_activities` (``card-activity-...``).
+
+        Returns:
+            dict | None: Merchant, amount, and -- for foreign purchases --
+            ``originalAmount`` / ``originalCurrency`` / ``foreignExchangeRate``
+            plus any ``fees``. ``None`` when the id is not a card transaction
+            (e.g. a card payment), which the API reports as a null object.
+        """
+        try:
+            return self.do_graphql_query(
+                "FetchCreditCardActivity",
+                {"id": activity_id},
+                "creditCardActivity",
+                "object",
+            )
+        except WSApiException as exc:
+            payload = exc.response
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, dict) and data.get("creditCardActivity") is None:
+                return None
+            raise
+
     def get_identity_current_financials(
         self,
         currency: str,

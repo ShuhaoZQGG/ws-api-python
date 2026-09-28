@@ -452,6 +452,31 @@ def test_get_identity_positions(api):
         assert result == fake_positions
 
 
+def test_get_creditcard_activity(api):
+    """Smoke test get_creditcard_activity."""
+    fake = {"id": "card-activity-1", "originalCurrency": "PEN"}
+    with patch.object(api, "do_graphql_query", return_value=fake) as mock_query:
+        result = api.get_creditcard_activity("card-activity-1")
+        assert result == fake
+        assert mock_query.call_args.args[0] == "FetchCreditCardActivity"
+
+
+def test_get_creditcard_activity_null_object(api):
+    """A null creditCardActivity (e.g. a card payment) returns None."""
+    null_response = {"data": {"creditCardActivity": None}}
+    exc = WSApiException("GraphQL query failed: FetchCreditCardActivity", null_response)
+    with patch.object(api, "do_graphql_query", side_effect=exc):
+        assert api.get_creditcard_activity("card-activity-payment") is None
+
+
+def test_get_creditcard_activity_other_error_propagates(api):
+    """Any other failure is re-raised untouched."""
+    exc = WSApiException("boom", {"errors": [{"message": "UNPROCESSABLE_ENTITY"}]})
+    with patch.object(api, "do_graphql_query", side_effect=exc), \
+            pytest.raises(WSApiException):
+        api.get_creditcard_activity("card-activity-1")
+
+
 def test_get_creditcard_account(api):
     """Smoke test get_creditcard_account."""
     fake = {"id": "cc1"}
