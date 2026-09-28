@@ -17,6 +17,7 @@ The person whose account it is should be the one typing the password + 2FA.
 """
 
 import argparse
+import os
 import sys
 from getpass import getpass
 
@@ -67,6 +68,8 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--profile", help="short label for this login (e.g. me, wife)")
     parser.add_argument("--username", help="WS account email (prompted if omitted)")
+    parser.add_argument("--export-session", metavar="PATH",
+                        help="also write the session JSON to PATH (mode 0600)")
     args = parser.parse_args()
 
     if args.profile and not PROFILE_RE.match(args.profile):
@@ -98,6 +101,15 @@ def main() -> int:
     # Prove the stored session actually works for API calls.
     ws = WealthsimpleAPI.from_token(WSAPISession.from_json(stored), persist, username)
     accounts = ws.get_accounts()
+
+    if args.export_session:
+        # Re-read: from_token may have refreshed the token and re-persisted it.
+        stored = keyring.get_password(f"{KEYRING_SERVICE}.{username}", "session") or stored
+        fd = os.open(args.export_session, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(stored)
+        os.chmod(args.export_session, 0o600)
+        print(f"Session also written to {args.export_session} (mode 0600).")
 
     if args.profile:
         save_profile(args.profile, username)
